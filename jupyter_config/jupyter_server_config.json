@@ -1,0 +1,15 @@
+{
+  "NotebookApp": {
+    "nbserver_extensions": {
+      "jupyter_nbextensions_configurator": true
+    }
+  },
+  "ServerApp": {
+    "iopub_msg_rate_limit": null,
+    "rate_limit_window": null
+  },
+  "MappingKernelManager": {
+    "cull_idle_timeout": null,
+    "cull_connected": false
+  }
+}

@@ -1,0 +1,17 @@
+
+services:
+  jupyter:
+    image: runpod/pytorch:latest
+    container_name: runpod_jupyter
+    command: ["/bin/bash", "/start.ssh"]
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./workspace:/workspace
+      - ./jupyter_config:/root/.jupyter
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    user: root
+
