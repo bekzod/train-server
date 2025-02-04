@@ -2,11 +2,12 @@
 
 #### Env variables needed
 create .env file with following
+```sh
 HF_HUB_ENABLE_HF_TRANSFER=1
 CUDA_VISIBLE_DEVICES=0,1
 HF_HUB_VERBOSITY=info
 HF_TOKEN=token
-
+```
 ## Installation
 
 ### System dependencies
