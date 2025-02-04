@@ -63,9 +63,6 @@ def trim_text(example):
     example["text"] = example["text"].strip()
     return example
 
-import os
-from datasets import load_dataset, DatasetDict, Dataset, concatenate_datasets, Audio
-
 def trim_text(example):
     """Trims the beginning and end of text fields."""
     example["text"] = example["text"].strip()  # Trim whitespace and unwanted characters
@@ -377,19 +374,57 @@ trainer = Seq2SeqTrainer(
     data_collator=data_collator,
     compute_metrics=compute_metrics,
     tokenizer=processor.feature_extractor,
-    callbacks=[EarlyStoppingCallback(early_stopping_patience=5)],
+    callbacks=[EarlyStoppingCallback(early_stopping_patience=8)],
 )
 model.config.use_cache = False
 
 logger.info("Stage: Starting training")
 trainer.train()
 
-# Push the trained model to the hub
+# Push the LoRA adapter to the hub with error handling
 today = datetime.date.today().strftime("%Y-%m-%d")
 adapter_to_push = f"{trained_adapter_repo}-{today}"
-model.push_to_hub(adapter_to_push, private=True)
 
+try:
+    logger.info("Pushing adapter to the hub: %s", adapter_to_push)
+    model.push_to_hub(adapter_to_push, private=True)
+    logger.info("Successfully pushed adapter to the hub.")
+except Exception as e:
+    logger.error("Failed to push adapter to the hub: %s", str(e))
+
+# Save final model, tokenizer, and processor locally
 final_dir = trained_model_name + "_final"
-trainer.save_model(final_dir) 
-tokenizer.save_pretrained(final_dir)
-processor.save_pretrained(final_dir)
+try:
+    logger.info("Saving final model locally in directory: %s", final_dir)
+    trainer.save_model(final_dir)
+    tokenizer.save_pretrained(final_dir)
+    processor.save_pretrained(final_dir)
+    logger.info("Successfully saved final model locally.")
+except Exception as e:
+    logger.error("Failed to save the final model locally: %s", str(e))
+
+# Reload base model, load adapter, merge and push the final merged model
+try:
+    logger.info("Reloading base model for adapter merging.")
+    base_model = WhisperForConditionalGeneration.from_pretrained(
+        model_name_or_path,
+        load_in_8bit=False,
+        device_map="auto"
+    )
+    # Load the adapter from the hub
+    merged_model = get_peft_model(base_model, config)  # Ensure the model structure is consistent
+    merged_model = merged_model.from_pretrained(merged_model, adapter_to_push)
+    merged_model = merged_model.merge_and_unload()
+    logger.info("Merged model dtype after merging: %s", merged_model.dtype)
+except Exception as e:
+    logger.error("Failed during adapter merge: %s", str(e))
+    merged_model = None
+
+if merged_model is not None:
+    try:
+        logger.info("Pushing the final merged model to the hub: %s", trained_model_repo)
+        merged_model.push_to_hub(trained_model_repo, safe_serialization=True)
+        processor.push_to_hub(trained_model_repo, private=True)
+        logger.info("Successfully pushed the final merged model and processor to the hub.")
+    except Exception as e:
+        logger.error("Failed to push the final merged model to the hub: %s", str(e))
