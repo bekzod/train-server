@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 import os
+import sys
 import torch
 import re
 import datetime
 from datetime import datetime as dt
+import logging
 from transformers import (
     pipeline,
     WhisperForConditionalGeneration,
@@ -26,6 +28,26 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Configure logging to file
+logger = logging.getLogger("transformers")
+logger.setLevel(logging.INFO)
+
+# File handler for logging to a file
+file_handler = logging.FileHandler("training.log")
+file_handler.setLevel(logging.INFO)
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
+# Console handler for logging to the console
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
+
+# You can also replace prints with logger.info if you wish:
+logger.info("Starting training script...")
+
 model_name_or_path = "openai/whisper-large-v3"
 language = "Uzbek"
 language_abbr = "uz"
@@ -36,7 +58,8 @@ trained_model_name = "whisper-turbo-llm-lingo"
 trained_adapter_repo = org + "/" + trained_adapter_name
 trained_model_repo = org + '/' + trained_model_name
 
-print("Stage: Loading and preparing additional datasets")
+logger.info("Stage: Loading and preparing additional datasets")
+
 def trim_text(example):
     example["text"] = example["text"].strip()
     return example
@@ -51,7 +74,8 @@ def load_and_prepare_datasets(datasets_info):
         revision = dataset_info.get("revision", "main")
         limit = dataset_info.get("limit")
         custom_filter = dataset_info.get("filter_fn")
-        print(f"Loading dataset: {dataset_name} | subset: {subset} | revision: {revision}")
+        logger.info(f"Loading dataset: {dataset_name} | subset: {subset} | revision: {revision}")
+
         if subset:
             loaded_dataset = load_dataset(
                 dataset_name,
@@ -183,14 +207,17 @@ datasets_info = [
 ]
 
 dataset = load_and_prepare_datasets(datasets_info)
-print("Combined dataset loaded:", dataset)
 
-print("Stage: Preparing feature extractor, tokenizer and processor")
+logger.info("Combined dataset loaded.")
+
+
+logger.info("Stage: Preparing feature extractor, tokenizer and processor")
 feature_extractor = WhisperFeatureExtractor.from_pretrained(model_name_or_path)
 tokenizer = WhisperTokenizer.from_pretrained(model_name_or_path, language=language, task=task)
 tokenizer.pad_token = tokenizer.eos_token
 processor = WhisperProcessor.from_pretrained(model_name_or_path, language=language, task=task)
-print("Sample training data:", dataset["train"][0])
+
+logger.info("Sample training data: %s", dataset["train"][0])
 
 def prepare_dataset(batch):
     audio = batch["audio"]
@@ -198,16 +225,17 @@ def prepare_dataset(batch):
     batch["labels"] = tokenizer(batch["text"]).input_ids
     return batch
 
-print("Stage: Mapping dataset for training")
+
+logger.info("Stage: Mapping dataset for training")
 dataset = dataset.map(
     prepare_dataset,
     remove_columns=dataset.column_names["train"],
     num_proc=1
 )
-print("Processed training dataset:", dataset["train"])
-print("Processed validation dataset:", dataset["validation"])
+logger.info("Processed training dataset and validation dataset.")
 
-print("Stage: Setting up data collator and evaluation metrics")
+
+logger.info("Stage: Setting up data collator and evaluation metrics")
 use_bf16 = True
 @dataclass
 class DataCollatorSpeechSeq2SeqWithPadding:
@@ -237,7 +265,8 @@ def compute_metrics(pred):
     wer_val = 100 * metric.compute(predictions=pred_str, references=label_str)
     return {"wer": wer_val}
 
-print("Stage: Loading pre-trained Whisper model")
+
+logger.info("Stage: Loading pre-trained Whisper model")
 model = WhisperForConditionalGeneration.from_pretrained(
     model_name_or_path,
     load_in_8bit=False,
@@ -245,13 +274,15 @@ model = WhisperForConditionalGeneration.from_pretrained(
     device_map="auto"
 )
 model.config.pad_token_id = tokenizer.pad_token_id
-print("Model dtype:", model.dtype)
+
+logger.info("Model dtype: %s", model.dtype)
 model.config.forced_decoder_ids = processor.tokenizer.get_decoder_prompt_ids(language=language, task=task)
 model.config.suppress_tokens = []
 model.generation_config.forced_decoder_ids = processor.tokenizer.get_decoder_prompt_ids(language=language, task=task)
 model.generation_config.suppress_tokens = []
 
-print("Stage: Applying LoRA")
+
+logger.info("Stage: Applying LoRA")
 config = LoraConfig(
     r=32,
     lora_alpha=8,
@@ -264,7 +295,8 @@ config = LoraConfig(
 model = get_peft_model(model, config)
 model.print_trainable_parameters()
 
-print("Stage: Setting training configuration")
+
+logger.info("Stage: Setting training configuration")
 training_args = Seq2SeqTrainingArguments(
     output_dir=trained_model_name,
     per_device_train_batch_size=6,
@@ -304,10 +336,12 @@ trainer = Seq2SeqTrainer(
 )
 model.config.use_cache = False
 
-print("Stage: Starting training")
+
+logger.info("Stage: Starting training")
 trainer.train()
 
 today = datetime.date.today().strftime("%Y-%m-%d")
 adapter_to_push = f"bekzod123/whisper-llm-large-adapter-{today}"
 model.push_to_hub(trained_adapter_repo, private=True)
-print("Stage: Training complete and adapter pushed to hub")
+
+logger.info("Stage: Training complete and adapter pushed to hub")

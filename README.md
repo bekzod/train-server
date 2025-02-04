@@ -15,20 +15,13 @@ sudo apt install -y nvidia-cuda-toolkit
 
 ### Python dependencies
 To install and set up the project, follow these steps:
-
-1. Clone the repository:
-   ```sh
-   git clone https://github.com/yourusername/yourproject.git
-   cd yourproject
-   ```
-
-2. Create and activate a virtual environment:
+1. Create and activate a virtual environment:
    ```sh
    python -m venv venv
    source venv/bin/activate  # On Windows use: venv\Scripts\activate
    ```
 
-3. Install dependencies:
+2. Install dependencies:
    ```sh
    pip install -r requirements.txt
    ```
