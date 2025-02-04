@@ -4,7 +4,6 @@ import sys
 import torch
 import re
 import datetime
-from datetime import datetime as dt
 import logging
 from transformers import (
     pipeline,
@@ -64,18 +63,29 @@ def trim_text(example):
     example["text"] = example["text"].strip()
     return example
 
+import os
+from datasets import load_dataset, DatasetDict, Dataset, concatenate_datasets, Audio
+
+def trim_text(example):
+    """Trims the beginning and end of text fields."""
+    example["text"] = example["text"].strip()  # Trim whitespace and unwanted characters
+    return example
+
 def load_and_prepare_datasets(datasets_info):
     combined_dataset = DatasetDict()
+
     for dataset_info in datasets_info:
         dataset_name = dataset_info["name"]
         audio_col = dataset_info["audio_col"]
         text_col = dataset_info["text_col"]
         subset = dataset_info.get("subset")
         revision = dataset_info.get("revision", "main")
-        limit = dataset_info.get("limit")
-        custom_filter = dataset_info.get("filter_fn")
-        logger.info(f"Loading dataset: {dataset_name} | subset: {subset} | revision: {revision}")
+        limit = dataset_info.get("limit")  # New optional field
+        custom_filter = dataset_info.get("filter_fn")  # Optional filter function
 
+        print(f"Loading dataset: {dataset_name} | subset: {subset} | revision: {revision}")
+
+        # Load dataset
         if subset:
             loaded_dataset = load_dataset(
                 dataset_name,
@@ -87,18 +97,26 @@ def load_and_prepare_datasets(datasets_info):
                 dataset_name,
                 revision=revision
             )
+
+        # Identify train / test splits
         if isinstance(loaded_dataset, Dataset):
             ds_train = loaded_dataset
             ds_test = None
         else:
             ds_train = loaded_dataset.get("train")
             ds_test = loaded_dataset.get("validate")
+
+            # If "validation" split exists, merge into train
             if loaded_dataset.get("validation"):
                 ds_train = concatenate_datasets([ds_train, loaded_dataset["validation"]])
+
+            # Merge or fallback for test
             if ds_test and loaded_dataset.get("test"):
                 ds_test = concatenate_datasets([ds_test, loaded_dataset["test"]])
             else:
                 ds_test = loaded_dataset.get("test") or ds_test
+
+        # If no train split found, fall back on first (or only) available split
         if ds_train is None:
             available_splits = list(loaded_dataset.keys())
             if len(available_splits) == 1:
@@ -106,57 +124,85 @@ def load_and_prepare_datasets(datasets_info):
                 ds_train = loaded_dataset[single_split_name]
                 ds_test = None
             else:
-                raise ValueError(f"No 'train' split found for {dataset_name}. Available splits: {available_splits}")
+                raise ValueError(
+                    f"No 'train' split found for {dataset_name}. Available splits: {available_splits}"
+                )
+
+        # If test split is missing, create it from train (90/10)
         if ds_test is None:
             split_result = ds_train.train_test_split(test_size=0.1, seed=42)
             ds_train = split_result["train"]
             ds_test = split_result["test"]
-        def filter_is_correct(example):
-            return example.get("is_correct", True)
-        ds_train = ds_train.filter(filter_is_correct)
-        ds_test = ds_test.filter(filter_is_correct)
+
+        # Apply custom filter if provided in the dataset_info
         if custom_filter is not None:
             ds_train = ds_train.filter(custom_filter)
             ds_test = ds_test.filter(custom_filter)
+
+        # Debug: Print column names before renaming
+        print(f"Columns before renaming: {ds_train.column_names}")
+
+        # Rename columns to standard 'audio' and 'text' only if they don't already exist
         rename_map = {}
-        if audio_col in ds_train.column_names:
+        if audio_col in ds_train.column_names and "audio" not in ds_train.column_names:
             rename_map[audio_col] = "audio"
-        if text_col in ds_train.column_names:
+        if text_col in ds_train.column_names and "text" not in ds_train.column_names:
             rename_map[text_col] = "text"
-        ds_train = ds_train.rename_columns(rename_map)
-        ds_test = ds_test.rename_columns(rename_map)
+
+        print(f"Renaming map: {rename_map}")
+
+        if rename_map:
+            ds_train = ds_train.rename_columns(rename_map)
+            ds_test = ds_test.rename_columns(rename_map)
+
+        # Keep only "audio" and "text" columns
         columns_to_keep = ["audio", "text"]
         ds_train = ds_train.remove_columns([col for col in ds_train.column_names if col not in columns_to_keep])
         ds_test = ds_test.remove_columns([col for col in ds_test.column_names if col not in columns_to_keep])
+
+        # Cast "audio" column to proper Audio feature if present
         if "audio" in ds_train.column_names:
             ds_train = ds_train.cast_column("audio", Audio(sampling_rate=16000))
         if "audio" in ds_test.column_names:
             ds_test = ds_test.cast_column("audio", Audio(sampling_rate=16000))
+
+        # Apply text trimming
         ds_train = ds_train.map(trim_text)
         ds_test = ds_test.map(trim_text)
+
+        # Apply limit if specified
         if limit is not None:
             ds_train = ds_train.select(range(min(limit, len(ds_train))))
             ds_test = ds_test.select(range(min(limit, len(ds_test))))
+
+        # Debug: Ensure only one 'text' column exists
+        if ds_train.column_names.count("text") > 1:
+            print("Warning: Duplicate 'text' column detected!")
+
+        # Concatenate into combined dataset
         if "train" not in combined_dataset:
             combined_dataset["train"] = ds_train
         else:
             combined_dataset["train"] = concatenate_datasets([combined_dataset["train"], ds_train])
+
         if "validation" not in combined_dataset:
             combined_dataset["validation"] = ds_test
         else:
             combined_dataset["validation"] = concatenate_datasets([combined_dataset["validation"], ds_test])
+
     return combined_dataset
 
+# Example usage
 datasets_info = [
     {
         "name": "DavronSherbaev/uzbekvoice-filtered",
         "audio_col": "path",
         "text_col": "sentence",
-        "limit": 20000,
+        "limit": 2000,
         "filter_fn": lambda ex: (
-            ex.get("reported_reasons") is None and
-            ex.get("downvotes_count", 0) == 0 and
-            ex.get("reported_count", 0) == 0 and
+            ex.get("reported_reasons") is None and 
+            ex.get("downvotes_count", 0) == 0 and 
+            ex.get("reported_count", 0) == 0 and 
             ex.get("client_id") not in [
                 "56ac8e86-b8c9-4879-a342-0eeb94f686fc",
                 "3d3fca02-6a07-41e2-9af4-60886ea60300",
@@ -295,7 +341,6 @@ config = LoraConfig(
 model = get_peft_model(model, config)
 model.print_trainable_parameters()
 
-
 logger.info("Stage: Setting training configuration")
 training_args = Seq2SeqTrainingArguments(
     output_dir=trained_model_name,
@@ -336,12 +381,15 @@ trainer = Seq2SeqTrainer(
 )
 model.config.use_cache = False
 
-
 logger.info("Stage: Starting training")
 trainer.train()
 
+# Push the trained model to the hub
 today = datetime.date.today().strftime("%Y-%m-%d")
-adapter_to_push = f"bekzod123/whisper-llm-large-adapter-{today}"
-model.push_to_hub(trained_adapter_repo, private=True)
+adapter_to_push = f"{trained_adapter_repo}-{today}"
+model.push_to_hub(adapter_to_push, private=True)
 
-logger.info("Stage: Training complete and adapter pushed to hub")
+final_dir = trained_model_name + "_final"
+trainer.save_model(final_dir) 
+tokenizer.save_pretrained(final_dir)
+processor.save_pretrained(final_dir)
