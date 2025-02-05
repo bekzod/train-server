@@ -86,12 +86,14 @@ def load_and_prepare_datasets(datasets_info):
             loaded_dataset = load_dataset(
                 dataset_name,
                 subset,
-                revision=revision
+                revision=revision,
+                trust_remote_code=True
             )
         else:
             loaded_dataset = load_dataset(
                 dataset_name,
-                revision=revision
+                revision=revision,
+                trust_remote_code=True
             )
 
         # Identify train / test splits
