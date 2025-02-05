@@ -15,7 +15,11 @@ from transformers import (
     Seq2SeqTrainer,
     EarlyStoppingCallback,
 )
-from transformers.integrations import TensorBoardCallback  # <-- Added for TensorBoard
+# ------------------- CHANGED: We now import wandb and WandbCallback instead of TensorBoard --------------------
+import wandb
+from transformers.integrations import WandbCallback
+# -------------------------------------------------------------------------------------------------------------
+
 from datasets import Dataset, DatasetDict, load_dataset, concatenate_datasets, Audio
 import librosa
 import soundfile as sf
@@ -92,7 +96,6 @@ def load_and_prepare_datasets(datasets_info):
 
         # Identify train / test splits
         if isinstance(loaded_dataset, Dataset):
-            # Single-split dataset
             ds_train = loaded_dataset
             ds_test = None
         else:
@@ -127,7 +130,7 @@ def load_and_prepare_datasets(datasets_info):
             ds_train = split_result["train"]
             ds_test = split_result["test"]
 
-        # Apply custom filter if provided in the dataset_info
+        # Apply custom filter if provided
         if custom_filter is not None:
             ds_train = ds_train.filter(custom_filter)
             ds_test = ds_test.filter(custom_filter)
@@ -150,7 +153,7 @@ def load_and_prepare_datasets(datasets_info):
         ds_train = ds_train.remove_columns([col for col in ds_train.column_names if col not in columns_to_keep])
         ds_test = ds_test.remove_columns([col for col in ds_test.column_names if col not in columns_to_keep])
 
-        # Cast "audio" column to proper Audio feature if present
+        # Cast "audio" column to Audio feature if present
         if "audio" in ds_train.column_names:
             ds_train = ds_train.cast_column("audio", Audio(sampling_rate=16000))
         if "audio" in ds_test.column_names:
@@ -163,7 +166,7 @@ def load_and_prepare_datasets(datasets_info):
         # Apply limit if specified
         if limit is not None:
             ds_train = ds_train.select(range(min(limit, len(ds_train))))
-            # We can also limit test set (e.g., 20% of limit):
+            # Optionally limit test set (e.g., 20% of limit)
             ds_test = ds_test.select(range(min(int(limit * 0.2), len(ds_test))))
 
         # Concatenate into combined dataset
@@ -271,15 +274,15 @@ class DataCollatorSpeechSeq2SeqWithPadding:
     def __call__(self, features: List[Dict[str, Union[List[int], torch.Tensor]]]) -> Dict[str, torch.Tensor]:
         input_dtype = torch.bfloat16 if use_bf16 else torch.float16
         input_features = [{"input_features": feature["input_features"]} for feature in features]
-        batch = processor.feature_extractor.pad(input_features, return_tensors="pt")
+        batch = self.processor.feature_extractor.pad(input_features, return_tensors="pt")
         batch = {k: v.to(input_dtype) for k, v in batch.items()}
 
         label_features = [{"input_ids": feature["labels"]} for feature in features]
-        labels_batch = processor.tokenizer.pad(label_features, return_tensors="pt")
+        labels_batch = self.processor.tokenizer.pad(label_features, return_tensors="pt")
         labels = labels_batch["input_ids"].masked_fill(labels_batch.attention_mask.ne(1), -100)
 
         # Remove BOS token if all labels start with it
-        if (labels[:, 0] == processor.tokenizer.bos_token_id).all().cpu().item():
+        if (labels[:, 0] == self.processor.tokenizer.bos_token_id).all().cpu().item():
             labels = labels[:, 1:]
 
         batch["labels"] = labels
@@ -357,8 +360,13 @@ training_args = Seq2SeqTrainingArguments(
     load_best_model_at_end=True,
     metric_for_best_model="wer",
     greater_is_better=False,
-    logging_dir="logs/tensorboard",  # <-- Added for TensorBoard
+    report_to="wandb",
+    run_name="my-whisper-run",
 )
+
+# Optionally configure W&B environment before trainer:
+# os.environ["WANDB_PROJECT"] = "my-whisper-project"
+# wandb.init(project="my-whisper-project")
 
 trainer = Seq2SeqTrainer(
     args=training_args,
@@ -368,10 +376,10 @@ trainer = Seq2SeqTrainer(
     data_collator=data_collator,
     compute_metrics=compute_metrics,
     tokenizer=processor.feature_extractor,
-    # Add both EarlyStopping and TensorBoard callbacks
     callbacks=[
         EarlyStoppingCallback(early_stopping_patience=5),
-        TensorBoardCallback(),  # <-- Added for TensorBoard
+        # ------------------- CHANGED: Use WandbCallback instead of TensorBoardCallback -------------------
+        WandbCallback(),
     ],
 )
 model.config.use_cache = False
