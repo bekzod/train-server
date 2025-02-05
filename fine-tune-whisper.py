@@ -191,6 +191,7 @@ datasets_info = [
         "name": "DavronSherbaev/uzbekvoice-filtered",
         "audio_col": "path",
         "text_col": "sentence",
+        "limit": 20000,
         "filter_fn": lambda ex: (
             ex.get("reported_reasons") is None and
             ex.get("downvotes_count", 0) == 0 and
@@ -207,30 +208,30 @@ datasets_info = [
             ]
         )
     },
-    {
-        "name": "Beehzod/dataset_for_STT_TTSmodels",
-        "audio_col": "audio",
-        "text_col": "transcription",
-        "revision": "refs/convert/parquet"
-    },
-    {
-        "name": "google/fleurs",
-        "subset": "uz_uz",
-        "audio_col": "audio",
-        "text_col": "transcription",
-    },
-    {
-        "name": "bekzod123/uzbek_voice",
-        "audio_col": "audio",
-        "text_col": "text",
-        "revision": "refs/convert/parquet",
-        "filter_fn": lambda ex: (ex.get("is_correct") == True)
-    },
-    {
-        "name": "bekzod123/uzbek_voice_2",
-        "audio_col": "audio",
-        "text_col": "sentence"
-    },
+    # {
+    #     "name": "Beehzod/dataset_for_STT_TTSmodels",
+    #     "audio_col": "audio",
+    #     "text_col": "transcription",
+    #     "revision": "refs/convert/parquet"
+    # },
+    # {
+    #     "name": "google/fleurs",
+    #     "subset": "uz_uz",
+    #     "audio_col": "audio",
+    #     "text_col": "transcription",
+    # },
+    # {
+    #     "name": "bekzod123/uzbek_voice",
+    #     "audio_col": "audio",
+    #     "text_col": "text",
+    #     "revision": "refs/convert/parquet",
+    #     "filter_fn": lambda ex: (ex.get("is_correct") == True)
+    # },
+    # {
+    #     "name": "bekzod123/uzbek_voice_2",
+    #     "audio_col": "audio",
+    #     "text_col": "sentence"
+    # },
     # {
     #     "name": "mozilla-foundation/common_voice_17_0",
     #     "subset": "uz",
