@@ -366,7 +366,7 @@ training_args = Seq2SeqTrainingArguments(
 
 # Optionally configure W&B environment before trainer:
 # os.environ["WANDB_PROJECT"] = "my-whisper-project"
-# wandb.init(project="my-whisper-project")
+wandb.init(project="my-whisper-project")
 
 trainer = Seq2SeqTrainer(
     args=training_args,
@@ -378,7 +378,6 @@ trainer = Seq2SeqTrainer(
     tokenizer=processor.feature_extractor,
     callbacks=[
         EarlyStoppingCallback(early_stopping_patience=5),
-        # ------------------- CHANGED: Use WandbCallback instead of TensorBoardCallback -------------------
         WandbCallback(),
     ],
 )
