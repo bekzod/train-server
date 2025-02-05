@@ -231,12 +231,12 @@ datasets_info = [
         "audio_col": "audio",
         "text_col": "sentence"
     },
-    {
-        "name": "mozilla-foundation/common_voice_17_0",
-        "subset": "uz",
-        "audio_col": "audio",
-        "text_col": "sentence",
-    },
+    # {
+    #     "name": "mozilla-foundation/common_voice_17_0",
+    #     "subset": "uz",
+    #     "audio_col": "audio",
+    #     "text_col": "sentence",
+    # },
 ]
 
 dataset = load_and_prepare_datasets(datasets_info)
