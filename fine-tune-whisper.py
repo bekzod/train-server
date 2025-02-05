@@ -370,7 +370,7 @@ trainer = Seq2SeqTrainer(
     tokenizer=processor.feature_extractor,
     # Add both EarlyStopping and TensorBoard callbacks
     callbacks=[
-        EarlyStoppingCallback(early_stopping_patience=6),
+        EarlyStoppingCallback(early_stopping_patience=5),
         TensorBoardCallback(),  # <-- Added for TensorBoard
     ],
 )
