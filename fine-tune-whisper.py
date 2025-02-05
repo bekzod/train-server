@@ -97,6 +97,7 @@ def load_and_prepare_datasets(datasets_info):
 
         # Identify train / test splits
         if isinstance(loaded_dataset, Dataset):
+            # Single-split dataset
             ds_train = loaded_dataset
             ds_test = None
         else:
@@ -136,21 +137,18 @@ def load_and_prepare_datasets(datasets_info):
             ds_train = ds_train.filter(custom_filter)
             ds_test = ds_test.filter(custom_filter)
 
-        # Debug: Print column names before renaming
-        print(f"Columns before renaming: {ds_train.column_names}")
-
-        # Rename columns to standard 'audio' and 'text' only if they don't already exist
+        # Rename columns to standard 'audio' and 'text'
         rename_map = {}
-        if audio_col in ds_train.column_names and "audio" not in ds_train.column_names:
+        if audio_col in ds_train.column_names:
             rename_map[audio_col] = "audio"
-        if text_col in ds_train.column_names and "text" not in ds_train.column_names:
+        if text_col in ds_train.column_names:
+            if text_col != "text":
+                ds_train = ds_train.remove_columns(["text"])
+                ds_test = ds_test.remove_columns(["text"])
             rename_map[text_col] = "text"
 
-        print(f"Renaming map: {rename_map}")
-
-        if rename_map:
-            ds_train = ds_train.rename_columns(rename_map)
-            ds_test = ds_test.rename_columns(rename_map)
+        ds_train = ds_train.rename_columns(rename_map)
+        ds_test = ds_test.rename_columns(rename_map)
 
         # Keep only "audio" and "text" columns
         columns_to_keep = ["audio", "text"]
@@ -170,11 +168,7 @@ def load_and_prepare_datasets(datasets_info):
         # Apply limit if specified
         if limit is not None:
             ds_train = ds_train.select(range(min(limit, len(ds_train))))
-            ds_test = ds_test.select(range(min(limit, len(ds_test))))
-
-        # Debug: Ensure only one 'text' column exists
-        if ds_train.column_names.count("text") > 1:
-            print("Warning: Duplicate 'text' column detected!")
+            ds_test = ds_test.select(range(min(limit * .2, len(ds_test))))
 
         # Concatenate into combined dataset
         if "train" not in combined_dataset:
