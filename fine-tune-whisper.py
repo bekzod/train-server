@@ -15,6 +15,7 @@ from transformers import (
     Seq2SeqTrainer,
     EarlyStoppingCallback,
 )
+from transformers.integrations import TensorBoardCallback  # <-- Added for TensorBoard
 from datasets import Dataset, DatasetDict, load_dataset, concatenate_datasets, Audio
 import librosa
 import soundfile as sf
@@ -44,7 +45,6 @@ console_handler.setLevel(logging.INFO)
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
-# You can also replace prints with logger.info if you wish:
 logger.info("Starting training script...")
 
 model_name_or_path = "openai/whisper-large-v3"
@@ -61,11 +61,6 @@ logger.info("Stage: Loading and preparing additional datasets")
 
 def trim_text(example):
     example["text"] = example["text"].strip()
-    return example
-
-def trim_text(example):
-    """Trims the beginning and end of text fields."""
-    example["text"] = example["text"].strip()  # Trim whitespace and unwanted characters
     return example
 
 def load_and_prepare_datasets(datasets_info):
@@ -168,7 +163,8 @@ def load_and_prepare_datasets(datasets_info):
         # Apply limit if specified
         if limit is not None:
             ds_train = ds_train.select(range(min(limit, len(ds_train))))
-            ds_test = ds_test.select(range(min(limit * .2, len(ds_test))))
+            # We can also limit test set (e.g., 20% of limit):
+            ds_test = ds_test.select(range(min(int(limit * 0.2), len(ds_test))))
 
         # Concatenate into combined dataset
         if "train" not in combined_dataset:
@@ -183,7 +179,6 @@ def load_and_prepare_datasets(datasets_info):
 
     return combined_dataset
 
-# Example usage
 datasets_info = [
     {
         "name": "DavronSherbaev/uzbekvoice-filtered",
@@ -191,9 +186,9 @@ datasets_info = [
         "text_col": "sentence",
         "limit": 2000,
         "filter_fn": lambda ex: (
-            ex.get("reported_reasons") is None and 
-            ex.get("downvotes_count", 0) == 0 and 
-            ex.get("reported_count", 0) == 0 and 
+            ex.get("reported_reasons") is None and
+            ex.get("downvotes_count", 0) == 0 and
+            ex.get("reported_count", 0) == 0 and
             ex.get("client_id") not in [
                 "56ac8e86-b8c9-4879-a342-0eeb94f686fc",
                 "3d3fca02-6a07-41e2-9af4-60886ea60300",
@@ -230,12 +225,8 @@ datasets_info = [
         "audio_col": "audio",
         "text_col": "sentence"
     },
-     # {
-    #     "name": "bekzod123/uzbek_voice_3",
-    #     "audio_col": "audio",
-    #     "text_col": "text"
-    # },
-     # {
+    # Uncomment or add more as needed:
+    # {
     #     "name": "mozilla-foundation/common_voice_17_0",
     #     "subset": "uz",
     #     "audio_col": "audio",
@@ -247,7 +238,6 @@ dataset = load_and_prepare_datasets(datasets_info)
 
 logger.info("Combined dataset loaded.")
 
-
 logger.info("Stage: Preparing feature extractor, tokenizer and processor")
 feature_extractor = WhisperFeatureExtractor.from_pretrained(model_name_or_path)
 tokenizer = WhisperTokenizer.from_pretrained(model_name_or_path, language=language, task=task)
@@ -258,10 +248,12 @@ logger.info("Sample training data: %s", dataset["train"][0])
 
 def prepare_dataset(batch):
     audio = batch["audio"]
-    batch["input_features"] = feature_extractor(audio["array"], sampling_rate=audio["sampling_rate"]).input_features[0]
+    batch["input_features"] = feature_extractor(
+        audio["array"],
+        sampling_rate=audio["sampling_rate"]
+    ).input_features[0]
     batch["labels"] = tokenizer(batch["text"]).input_ids
     return batch
-
 
 logger.info("Stage: Mapping dataset for training")
 dataset = dataset.map(
@@ -271,9 +263,9 @@ dataset = dataset.map(
 )
 logger.info("Processed training dataset and validation dataset.")
 
-
 logger.info("Stage: Setting up data collator and evaluation metrics")
 use_bf16 = True
+
 @dataclass
 class DataCollatorSpeechSeq2SeqWithPadding:
     processor: Any
@@ -282,11 +274,15 @@ class DataCollatorSpeechSeq2SeqWithPadding:
         input_features = [{"input_features": feature["input_features"]} for feature in features]
         batch = processor.feature_extractor.pad(input_features, return_tensors="pt")
         batch = {k: v.to(input_dtype) for k, v in batch.items()}
+
         label_features = [{"input_ids": feature["labels"]} for feature in features]
         labels_batch = processor.tokenizer.pad(label_features, return_tensors="pt")
         labels = labels_batch["input_ids"].masked_fill(labels_batch.attention_mask.ne(1), -100)
+
+        # Remove BOS token if all labels start with it
         if (labels[:, 0] == processor.tokenizer.bos_token_id).all().cpu().item():
             labels = labels[:, 1:]
+
         batch["labels"] = labels
         return batch
 
@@ -302,7 +298,6 @@ def compute_metrics(pred):
     wer_val = 100 * metric.compute(predictions=pred_str, references=label_str)
     return {"wer": wer_val}
 
-
 logger.info("Stage: Loading pre-trained Whisper model")
 model = WhisperForConditionalGeneration.from_pretrained(
     model_name_or_path,
@@ -313,11 +308,14 @@ model = WhisperForConditionalGeneration.from_pretrained(
 model.config.pad_token_id = tokenizer.pad_token_id
 
 logger.info("Model dtype: %s", model.dtype)
-model.config.forced_decoder_ids = processor.tokenizer.get_decoder_prompt_ids(language=language, task=task)
+model.config.forced_decoder_ids = processor.tokenizer.get_decoder_prompt_ids(
+    language=language, task=task
+)
 model.config.suppress_tokens = []
-model.generation_config.forced_decoder_ids = processor.tokenizer.get_decoder_prompt_ids(language=language, task=task)
+model.generation_config.forced_decoder_ids = processor.tokenizer.get_decoder_prompt_ids(
+    language=language, task=task
+)
 model.generation_config.suppress_tokens = []
-
 
 logger.info("Stage: Applying LoRA")
 config = LoraConfig(
@@ -333,6 +331,7 @@ model = get_peft_model(model, config)
 model.print_trainable_parameters()
 
 logger.info("Stage: Setting training configuration")
+
 training_args = Seq2SeqTrainingArguments(
     output_dir=trained_model_name,
     per_device_train_batch_size=6,
@@ -359,7 +358,9 @@ training_args = Seq2SeqTrainingArguments(
     load_best_model_at_end=True,
     metric_for_best_model="wer",
     greater_is_better=False,
+    logging_dir="logs/tensorboard",  # <-- Added for TensorBoard
 )
+
 trainer = Seq2SeqTrainer(
     args=training_args,
     model=model,
@@ -368,7 +369,11 @@ trainer = Seq2SeqTrainer(
     data_collator=data_collator,
     compute_metrics=compute_metrics,
     tokenizer=processor.feature_extractor,
-    callbacks=[EarlyStoppingCallback(early_stopping_patience=8)],
+    # Add both EarlyStopping and TensorBoard callbacks
+    callbacks=[
+        EarlyStoppingCallback(early_stopping_patience=8),
+        TensorBoardCallback(),  # <-- Added for TensorBoard
+    ],
 )
 model.config.use_cache = False
 
