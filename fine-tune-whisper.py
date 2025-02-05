@@ -141,8 +141,10 @@ def load_and_prepare_datasets(datasets_info):
             rename_map[audio_col] = "audio"
         if text_col in ds_train.column_names:
             if text_col != "text":
-                ds_train = ds_train.remove_columns(["text"])
-                ds_test = ds_test.remove_columns(["text"])
+                if "text" in ds_train.column_names:
+                    ds_train = ds_train.remove_columns(["text"])
+                if "text" in ds_test.column_names:
+                    ds_test = ds_test.remove_columns(["text"])
             rename_map[text_col] = "text"
 
         ds_train = ds_train.rename_columns(rename_map)
