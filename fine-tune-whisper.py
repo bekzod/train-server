@@ -104,9 +104,13 @@ def load_and_prepare_datasets(datasets_info):
             ds_train = loaded_dataset.get("train")
             ds_test = loaded_dataset.get("validate")
 
-            # If "validation" split exists, merge into train
+            # If "validation" split exists, merge it into train
             if loaded_dataset.get("validation"):
                 ds_train = concatenate_datasets([ds_train, loaded_dataset["validation"]])
+
+            # If "other" split exists, merge it into train
+            if loaded_dataset.get("other"):
+                ds_train = concatenate_datasets([ds_train, loaded_dataset["other"]])
 
             # Merge or fallback for test
             if ds_test and loaded_dataset.get("test"):
