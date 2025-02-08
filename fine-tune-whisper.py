@@ -32,18 +32,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Configure logging to file
+# Configure logging to file and console
 logger = logging.getLogger("transformers")
 logger.setLevel(logging.INFO)
-
-# File handler for logging to a file
 file_handler = logging.FileHandler("training.log")
 file_handler.setLevel(logging.INFO)
 formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
-
-# Console handler for logging to the console
 console_handler = logging.StreamHandler(sys.stdout)
 console_handler.setLevel(logging.INFO)
 console_handler.setFormatter(formatter)
@@ -63,21 +59,16 @@ trained_model_repo = org + '/' + trained_model_name
 
 logger.info("Stage: Loading and preparing additional datasets")
 
-def trim_text(example):
-    example["text"] = example["text"].strip()
-    return example
-
 def load_and_prepare_datasets(datasets_info):
     combined_dataset = DatasetDict()
-
     for dataset_info in datasets_info:
         dataset_name = dataset_info["name"]
         audio_col = dataset_info["audio_col"]
         text_col = dataset_info["text_col"]
         subset = dataset_info.get("subset")
         revision = dataset_info.get("revision", "main")
-        limit = dataset_info.get("limit")  # New optional field
-        custom_filter = dataset_info.get("filter_fn")  # Optional filter function
+        limit = dataset_info.get("limit")  # optional
+        custom_filter = dataset_info.get("filter_fn")  # optional filter function
 
         print(f"Loading dataset: {dataset_name} | subset: {subset} | revision: {revision}")
 
@@ -103,22 +94,15 @@ def load_and_prepare_datasets(datasets_info):
         else:
             ds_train = loaded_dataset.get("train")
             ds_test = loaded_dataset.get("validate")
-
-            # If "validation" split exists, merge it into train
             if loaded_dataset.get("validation"):
                 ds_train = concatenate_datasets([ds_train, loaded_dataset["validation"]])
-
-            # If "other" split exists, merge it into train
             if loaded_dataset.get("other"):
                 ds_train = concatenate_datasets([ds_train, loaded_dataset["other"]])
-
-            # Merge or fallback for test
             if ds_test and loaded_dataset.get("test"):
                 ds_test = concatenate_datasets([ds_test, loaded_dataset["test"]])
             else:
                 ds_test = loaded_dataset.get("test") or ds_test
 
-        # If no train split found, fall back on first (or only) available split
         if ds_train is None:
             available_splits = list(loaded_dataset.keys())
             if len(available_splits) == 1:
@@ -130,7 +114,6 @@ def load_and_prepare_datasets(datasets_info):
                     f"No 'train' split found for {dataset_name}. Available splits: {available_splits}"
                 )
 
-        # If test split is missing, create it from train (90/10)
         if ds_test is None:
             split_result = ds_train.train_test_split(test_size=0.1, seed=42)
             ds_train = split_result["train"]
@@ -161,20 +144,18 @@ def load_and_prepare_datasets(datasets_info):
         ds_train = ds_train.remove_columns([col for col in ds_train.column_names if col not in columns_to_keep])
         ds_test = ds_test.remove_columns([col for col in ds_test.column_names if col not in columns_to_keep])
 
-        # Cast "audio" column to Audio feature if present
+        # Cast "audio" column to Audio feature with a sampling rate of 16000
         if "audio" in ds_train.column_names:
             ds_train = ds_train.cast_column("audio", Audio(sampling_rate=16000))
         if "audio" in ds_test.column_names:
             ds_test = ds_test.cast_column("audio", Audio(sampling_rate=16000))
 
-        # Apply text trimming
-        ds_train = ds_train.map(trim_text)
-        ds_test = ds_test.map(trim_text)
+        # NOTE: The previous version applied a map() to trim the text here.
+        # We now handle text trimming inside prepare_dataset so we only call map() once later.
 
         # Apply limit if specified
         if limit is not None:
             ds_train = ds_train.select(range(min(limit, len(ds_train))))
-            # Optionally limit test set (e.g., 20% of limit)
             ds_test = ds_test.select(range(min(int(limit * 0.2), len(ds_test))))
 
         # Concatenate into combined dataset
@@ -244,7 +225,6 @@ datasets_info = [
 ]
 
 dataset = load_and_prepare_datasets(datasets_info)
-
 logger.info("Combined dataset loaded.")
 
 logger.info("Stage: Preparing feature extractor, tokenizer and processor")
@@ -256,6 +236,13 @@ processor = WhisperProcessor.from_pretrained(model_name_or_path, language=langua
 logger.info("Sample training data: %s", dataset["train"][0])
 
 def prepare_dataset(batch):
+    # Instead of a separate map call for text trimming, trim the text here.
+    # Handle both single string or list of strings.
+    if isinstance(batch["text"], str):
+        batch["text"] = batch["text"].strip()
+    else:
+        batch["text"] = [txt.strip() for txt in batch["text"]]
+
     audio = batch["audio"]
     batch["input_features"] = feature_extractor(
         audio["array"],
@@ -265,12 +252,13 @@ def prepare_dataset(batch):
     return batch
 
 logger.info("Stage: Mapping dataset for training")
+# A single map() call now prepares both the features and the trimmed text.
 dataset = dataset.map(
     prepare_dataset,
     remove_columns=dataset.column_names["train"],
     num_proc=1
 )
-logger.info("Processed training dataset and validation dataset.")
+logger.info("Processed training and validation datasets.")
 
 logger.info("Stage: Setting up data collator and evaluation metrics")
 use_bf16 = True
@@ -340,7 +328,6 @@ model = get_peft_model(model, config)
 model.print_trainable_parameters()
 
 logger.info("Stage: Setting training configuration")
-
 training_args = Seq2SeqTrainingArguments(
     output_dir=trained_model_name,
     per_device_train_batch_size=6,
@@ -374,7 +361,6 @@ training_args = Seq2SeqTrainingArguments(
 )
 
 # Optionally configure W&B environment before trainer:
-# os.environ["WANDB_PROJECT"] = "my-whisper-project"
 wandb.init(project="my-whisper-project")
 
 trainer = Seq2SeqTrainer(
