@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+from dotenv import load_dotenv
+load_dotenv()
+
 import os
 import sys
 import torch
@@ -28,9 +31,6 @@ import getpass
 from dataclasses import dataclass
 from typing import Any, Dict, List, Union
 from peft import LoraConfig, get_peft_model
-from dotenv import load_dotenv
-
-load_dotenv()
 
 # Configure logging to file and console
 logger = logging.getLogger("transformers")
