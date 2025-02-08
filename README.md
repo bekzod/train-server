@@ -7,6 +7,7 @@ HF_HUB_ENABLE_HF_TRANSFER=1
 CUDA_VISIBLE_DEVICES=0,1
 HF_HUB_VERBOSITY=info
 HF_TOKEN=token
+HF_HOME=/home/ubuntu/whisper
 ```
 ## Installation
 
