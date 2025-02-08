@@ -7,7 +7,10 @@ HF_HUB_ENABLE_HF_TRANSFER=1
 CUDA_VISIBLE_DEVICES=0,1
 HF_HUB_VERBOSITY=info
 HF_TOKEN=token
-HF_HOME=/home/ubuntu/whisper
+HF_HOME=/home/ubuntu/whisper/hf_cache
+HF_DATASETS_CACHE=/home/ubuntu/whisper/hf_cache
+HF_METRICS_CACHE=/home/ubuntu/whisper/hf_cache
+TRANSFORMERS_CACHE=/home/ubuntu/whisper/hf_cache
 ```
 ## Installation
 
