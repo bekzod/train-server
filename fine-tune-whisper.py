@@ -330,8 +330,8 @@ model.print_trainable_parameters()
 logger.info("Stage: Setting training configuration")
 training_args = Seq2SeqTrainingArguments(
     output_dir=trained_model_name,
-    per_device_train_batch_size=16,
-    per_device_eval_batch_size=16,
+    per_device_train_batch_size=5,
+    per_device_eval_batch_size=5,
     gradient_accumulation_steps=2,
     learning_rate=3e-4,
     weight_decay=0,
