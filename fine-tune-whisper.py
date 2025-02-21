@@ -347,6 +347,7 @@ training_args = Seq2SeqTrainingArguments(
     eval_strategy="steps",
     fp16=not use_bf16,
     bf16=use_bf16,
+    bf16_full_eval=use_bf16,
     generation_max_length=128,
     save_steps=800,
     eval_steps=400,
