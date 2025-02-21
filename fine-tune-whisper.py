@@ -171,6 +171,8 @@ def load_and_prepare_datasets(datasets_info):
 
     return combined_dataset
 
+MAX_WORDS = 60
+
 datasets_info = [
     {
         "name": "DavronSherbaev/uzbekvoice-filtered",
@@ -189,38 +191,42 @@ datasets_info = [
                 "d6fd3dc4-a55d-4a80-9bbf-b713325d05be",
                 "10b29e87-bf01-4b16-bead-a044076f849b",
                 "e3412d51-f079-4167-b3f9-311a976443ce"
-            ]
+            ] and len(ex["sentence"].split()) < MAX_WORDS
         )
     },
     {
         "name": "Beehzod/dataset_for_STT_TTSmodels",
         "audio_col": "audio",
         "text_col": "transcription",
-        "revision": "refs/convert/parquet"
+        "revision": "refs/convert/parquet",
+        "filter_fn": lambda ex: len(ex["transcription"].split()) < MAX_WORDS
     },
     {
         "name": "google/fleurs",
         "subset": "uz_uz",
         "audio_col": "audio",
         "text_col": "transcription",
+        "filter_fn": lambda ex: len(ex["transcription"].split()) < MAX_WORDS
     },
     {
         "name": "bekzod123/uzbek_voice",
         "audio_col": "audio",
         "text_col": "text",
         "revision": "refs/convert/parquet",
-        "filter_fn": lambda ex: (ex.get("is_correct") == True)
+        "filter_fn": lambda ex: (ex.get("is_correct") == True) and len(ex["text"].split()) < MAX_WORDS
     },
     {
         "name": "bekzod123/uzbek_voice_2",
         "audio_col": "audio",
-        "text_col": "sentence"
+        "text_col": "sentence",
+        "filter_fn": lambda ex: len(ex["sentence"].split()) < MAX_WORDS
     },
     {
         "name": "mozilla-foundation/common_voice_17_0",
         "subset": "uz",
         "audio_col": "audio",
         "text_col": "sentence",
+        "filter_fn": lambda ex: len(ex["sentence"].split()) < MAX_WORDS
     },
 ]
 
