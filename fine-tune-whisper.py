@@ -216,12 +216,12 @@ datasets_info = [
         "audio_col": "audio",
         "text_col": "sentence"
     },
-    # {
-    #     "name": "mozilla-foundation/common_voice_17_0",
-    #     "subset": "uz",
-    #     "audio_col": "audio",
-    #     "text_col": "sentence",
-    # },
+    {
+        "name": "mozilla-foundation/common_voice_17_0",
+        "subset": "uz",
+        "audio_col": "audio",
+        "text_col": "sentence",
+    },
 ]
 
 dataset = load_and_prepare_datasets(datasets_info)
@@ -330,8 +330,8 @@ model.print_trainable_parameters()
 logger.info("Stage: Setting training configuration")
 training_args = Seq2SeqTrainingArguments(
     output_dir=trained_model_name,
-    per_device_train_batch_size=5,
-    per_device_eval_batch_size=5,
+    per_device_train_batch_size=4,
+    per_device_eval_batch_size=4,
     gradient_accumulation_steps=2,
     learning_rate=5e-4,
     weight_decay=0,
