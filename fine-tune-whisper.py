@@ -221,13 +221,13 @@ datasets_info = [
         "text_col": "sentence",
         "filter_fn": lambda ex: len(ex["sentence"].split()) < MAX_WORDS
     },
-    {
-        "name": "mozilla-foundation/common_voice_17_0",
-        "subset": "uz",
-        "audio_col": "audio",
-        "text_col": "sentence",
-        "filter_fn": lambda ex: len(ex["sentence"].split()) < MAX_WORDS
-    },
+    # {
+    #     "name": "mozilla-foundation/common_voice_17_0",
+    #     "subset": "uz",
+    #     "audio_col": "audio",
+    #     "text_col": "sentence",
+    #     "filter_fn": lambda ex: len(ex["sentence"].split()) < MAX_WORDS
+    # },
 ]
 
 dataset = load_and_prepare_datasets(datasets_info)
