@@ -191,7 +191,7 @@ datasets_info = [
                 "d6fd3dc4-a55d-4a80-9bbf-b713325d05be",
                 "10b29e87-bf01-4b16-bead-a044076f849b",
                 "e3412d51-f079-4167-b3f9-311a976443ce"
-            ] and len(ex["sentence"].split()) < MAX_WORDS
+            ] and len(ex["sentence"].split()) < MAX_WORDS and len(ex["sentence"].split()) > 0
         )
     },
     {
@@ -199,27 +199,27 @@ datasets_info = [
         "audio_col": "audio",
         "text_col": "transcription",
         "revision": "refs/convert/parquet",
-        "filter_fn": lambda ex: len(ex["transcription"].split()) < MAX_WORDS
+        "filter_fn": lambda ex: len(ex["transcription"].split()) < MAX_WORDS and len(ex["transcription"].split()) > 0
     },
     {
         "name": "google/fleurs",
         "subset": "uz_uz",
         "audio_col": "audio",
         "text_col": "transcription",
-        "filter_fn": lambda ex: len(ex["transcription"].split()) < MAX_WORDS
+        "filter_fn": lambda ex: len(ex["transcription"].split()) < MAX_WORDS and len(ex["transcription"].split()) > 0
     },
     {
         "name": "bekzod123/uzbek_voice",
         "audio_col": "audio",
         "text_col": "text",
         "revision": "refs/convert/parquet",
-        "filter_fn": lambda ex: (ex.get("is_correct") == True) and len(ex["text"].split()) < MAX_WORDS
+        "filter_fn": lambda ex: (ex.get("is_correct") == True) and len(ex["text"].split()) < MAX_WORDS and len(ex["text"].split()) > 0
     },
     {
         "name": "bekzod123/uzbek_voice_2",
         "audio_col": "audio",
         "text_col": "sentence",
-        "filter_fn": lambda ex: len(ex["sentence"].split()) < MAX_WORDS
+        "filter_fn": lambda ex: len(ex["sentence"].split()) < MAX_WORDS and len(ex["sentence"].split()) > 0
     },
     # {
     #     "name": "mozilla-foundation/common_voice_17_0",
@@ -339,10 +339,10 @@ training_args = Seq2SeqTrainingArguments(
     per_device_train_batch_size=4,
     per_device_eval_batch_size=4,
     gradient_accumulation_steps=2,
-    learning_rate=7e-4,
+    learning_rate=6e-4,
     weight_decay=0,
-    warmup_ratio=0.08,
-    num_train_epochs=2,
+    warmup_ratio=0.1,
+    num_train_epochs=1,
     optim="adamw_torch",
     eval_strategy="steps",
     fp16=not use_bf16,
@@ -357,7 +357,7 @@ training_args = Seq2SeqTrainingArguments(
     label_names=["labels"],
     predict_with_generate=True,
     do_eval=True,
-    lr_scheduler_type="linear",
+    lr_scheduler_type="cosine",
     load_best_model_at_end=True,
     evaluation_strategy="steps",
     save_strategy="steps",
