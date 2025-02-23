@@ -325,7 +325,7 @@ config = LoraConfig(
     use_rslora=True,
     target_modules=["q_proj", "v_proj", "k_proj", "out_proj", "fc1", "fc2"],
     modules_to_save=["model.embed_tokens"],
-    lora_dropout=0.05,
+    lora_dropout=0.04,
     bias="none"
 )
 model = get_peft_model(model, config)
@@ -341,7 +341,7 @@ training_args = Seq2SeqTrainingArguments(
     weight_decay=0.01,
     warmup_ratio=0.1,
     num_train_epochs=1.5,
-    # optim="adamw_torch",
+    optim="adamw_torch",
     eval_strategy="steps",
     fp16=not use_bf16,
     bf16=use_bf16,
