@@ -322,7 +322,7 @@ model.generation_config.suppress_tokens = []
 
 logger.info("Stage: Applying LoRA")
 config = LoraConfig(
-    r=32,
+    r=34,
     lora_alpha=8,
     use_rslora=True,
     target_modules=["q_proj", "v_proj", "k_proj", "out_proj", "fc1", "fc2"],
@@ -339,15 +339,15 @@ training_args = Seq2SeqTrainingArguments(
     per_device_train_batch_size=4,
     per_device_eval_batch_size=4,
     gradient_accumulation_steps=2,
-    learning_rate=6e-4,
-    weight_decay=0,
+    learning_rate=5e-4,
+    weight_decay=0.01,
     warmup_ratio=0.1,
-    num_train_epochs=1,
+    num_train_epochs=1.5,
     optim="adamw_torch",
     eval_strategy="steps",
     fp16=not use_bf16,
     bf16=use_bf16,
-    bf16_full_eval=use_bf16,
+    # bf16_full_eval=use_bf16,
     generation_max_length=128,
     save_steps=1000,
     eval_steps=500,
@@ -379,7 +379,7 @@ trainer = Seq2SeqTrainer(
     compute_metrics=compute_metrics,
     tokenizer=processor.feature_extractor,
     callbacks=[
-        EarlyStoppingCallback(early_stopping_patience=5),
+        EarlyStoppingCallback(early_stopping_patience=10),
         WandbCallback(),
     ],
 )
