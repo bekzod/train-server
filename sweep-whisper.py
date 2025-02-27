@@ -230,7 +230,7 @@ def main():
             "name": "DavronSherbaev/uzbekvoice-filtered",
             "audio_col": "path",
             "text_col": "sentence",
-            "limit": 1000,
+            "limit": 1200,
             "filter_fn": lambda ex: (
                 ex.get("reported_reasons") is None and
                 ex.get("downvotes_count", 0) == 0 and
@@ -392,4 +392,8 @@ def main():
             logger.error("Failed to push the final merged model to the hub: %s", str(e))
 
 if __name__ == "__main__":
-    main()
+    sweep_id = os.environ.get("SWEEP_ID")
+    if sweep_id:
+        wandb.agent(sweep_id, function=main)
+    else:
+        main()
