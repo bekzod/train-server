@@ -1,0 +1,35 @@
+method: bayes
+metric:
+  name: wer
+  goal: minimize
+parameters:
+  learning_rate:
+    values: [1e-4, 5e-4, 1e-3]
+  per_device_train_batch_size:
+    values: 5
+  per_device_eval_batch_size:
+    values: 5
+  gradient_accumulation_steps:
+    values: [8, 16, 32]
+  num_train_epochs:
+    values: [1, 1.5, 2]
+  generation_max_length:
+    value: 225
+  save_steps:
+    value: 1000
+  eval_steps:
+    value: 50
+  logging_steps:
+    value: 50
+  weight_decay:
+    value: [0.01, 0.1, 0.2]
+  warmup_ratio:
+    value: [0.1, 0.05]
+  lora_r:
+    values: [8, 16, 34, 64]
+  lora_alpha:
+    values: [4, 8, 16, 34]
+  lora_dropout:
+    values: [0.01, 0.05, 0.1]
+  bf16_full_eval:
+    value: [true, false]
