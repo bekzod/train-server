@@ -203,9 +203,8 @@ def main():
     warmup_ratio = config.get("warmup_ratio", 0.1)
     num_train_epochs = config.get("num_train_epochs", 1.5)
     generation_max_length = config.get("generation_max_length", 225)
-    save_steps = config.get("save_steps", 1000)
-    eval_steps = config.get("eval_steps", 500)
-    logging_steps = config.get("logging_steps", 250)
+    eval_steps = 2
+    logging_steps = 2
     # LoRA hyperparams
     lora_r = config.get("lora_r", 34)
     lora_alpha = config.get("lora_alpha", 8)
@@ -230,7 +229,7 @@ def main():
             "name": "DavronSherbaev/uzbekvoice-filtered",
             "audio_col": "path",
             "text_col": "sentence",
-            "limit": 1200,
+            "limit": 2000,
             "filter_fn": lambda ex: (
                 ex.get("reported_reasons") is None and
                 ex.get("downvotes_count", 0) == 0 and
@@ -250,6 +249,15 @@ def main():
     ]
     dataset = load_and_prepare_datasets(datasets_info)
     logger.info("Dataset loaded.")
+
+    # Debug: Log dataset sizes
+    train_size = len(dataset["train"])
+    val_size = len(dataset["validation"])
+    logger.info("Training dataset size: %d", train_size)
+    logger.info("Validation dataset size: %d", val_size)
+    if train_size == 0:
+        logger.error("Training dataset is empty! Exiting.")
+        return
 
     logger.info("Stage: Preparing feature extractor, tokenizer and processor")
     feature_extractor = WhisperFeatureExtractor.from_pretrained(model_name_or_path)
@@ -309,7 +317,6 @@ def main():
         bf16=use_bf16,
         bf16_full_eval=bf16_full_eval,
         generation_max_length=generation_max_length,
-        save_steps=save_steps,
         eval_steps=eval_steps,
         save_total_limit=5,
         logging_steps=logging_steps,
@@ -327,6 +334,10 @@ def main():
         run_name="my-whisper-run",
     )
 
+    # Log the training configuration for debugging
+    logger.info("Training configuration: %s", training_args)
+
+    # Setup the trainer
     trainer = Seq2SeqTrainer(
         args=training_args,
         model=model,
@@ -343,7 +354,9 @@ def main():
     model.config.use_cache = False
 
     logger.info("Stage: Starting training")
-    trainer.train()
+    # Begin training and log the progress
+    train_result = trainer.train()
+    logger.info("Training finished. Train result: %s", train_result)
 
     # Optionally push the adapter to the hub
     today = datetime.date.today().strftime("%Y-%m-%d")

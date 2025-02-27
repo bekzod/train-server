@@ -1,31 +1,39 @@
+program: train.py
 method: bayes
 metric:
-  name: wer
   goal: minimize
+  name: wer
 parameters:
   learning_rate:
-    values: [1e-4, 5e-4, 1e-3]
+    max: 0.001
+    min: 0.0001
+    distribution: uniform
   gradient_accumulation_steps:
-    values: [8, 16, 32]
+    max: 32
+    min: 8
+    distribution: int_uniform
   num_train_epochs:
-    values: [1, 1.5, 2]
-  generation_max_length:
-    value: 225
-  save_steps:
-    value: 1000
-  eval_steps:
-    value: 50
-  logging_steps:
-    value: 50
+    max: 2
+    min: 1
+    distribution: uniform
   weight_decay:
     values: [0.01, 0.1, 0.2]
+    distribution: categorical
   warmup_ratio:
     values: [0.1, 0.05]
+    distribution: categorical
   lora_r:
-    values: [8, 16, 34, 64]
+    max: 64
+    min: 8
+    distribution: int_uniform
   lora_alpha:
-    values: [4, 8, 16, 34]
+    max: 34
+    min: 4
+    distribution: int_uniform
   lora_dropout:
-    values: [0.01, 0.05, 0.1]
+    max: 0.1
+    min: 0.01
+    distribution: uniform
   bf16_full_eval:
-    values: [true, false]
+    values: ["true", "false"]
+    distribution: categorical
