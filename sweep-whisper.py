@@ -203,8 +203,8 @@ def main():
     warmup_ratio = config.get("warmup_ratio", 0.1)
     num_train_epochs = config.get("num_train_epochs", 1.5)
     generation_max_length = config.get("generation_max_length", 225)
-    eval_steps = 2
-    logging_steps = 2
+    eval_steps = 5
+    logging_steps = 5
     # LoRA hyperparams
     lora_r = config.get("lora_r", 34)
     lora_alpha = config.get("lora_alpha", 8)
