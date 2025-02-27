@@ -28,7 +28,7 @@ import evaluate
 import getpass
 from dataclasses import dataclass
 from typing import Any, Dict, List, Union
-from peft import LoraConfig, get_peft_model
+from peft import LoraConfig, get_peft_model, PeftModel  # Import PeftModel
 
 # Configure logging to file and console
 logger = logging.getLogger("transformers")

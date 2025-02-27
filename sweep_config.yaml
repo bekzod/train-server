@@ -31,7 +31,7 @@ parameters:
     distribution: int_uniform
   lora_dropout:
     max: 0.1
-    min: 0.01
+    min: 0.005
     distribution: uniform
   bf16_full_eval:
     values: ["true", "false"]

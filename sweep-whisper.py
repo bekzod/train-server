@@ -358,52 +358,6 @@ def main():
     train_result = trainer.train()
     logger.info("Training finished. Train result: %s", train_result)
 
-    # Optionally push the adapter to the hub
-    today = datetime.date.today().strftime("%Y-%m-%d")
-    adapter_to_push = f"{trained_adapter_repo}-{today}"
-    try:
-        logger.info("Pushing adapter to the hub: %s", adapter_to_push)
-        model.push_to_hub(adapter_to_push, private=True)
-        logger.info("Successfully pushed adapter to the hub.")
-    except Exception as e:
-        logger.error("Failed to push adapter to the hub: %s", str(e))
-
-    # Save final model, tokenizer, and processor locally
-    final_dir = trained_model_name + "_final"
-    try:
-        logger.info("Saving final model locally in directory: %s", final_dir)
-        trainer.save_model(final_dir)
-        tokenizer.save_pretrained(final_dir)
-        processor.save_pretrained(final_dir)
-        logger.info("Successfully saved final model locally.")
-    except Exception as e:
-        logger.error("Failed to save the final model locally: %s", str(e))
-
-    # Reload base model, merge adapter, and push final merged model if desired
-    try:
-        logger.info("Reloading base model for adapter merging.")
-        base_model = WhisperForConditionalGeneration.from_pretrained(
-            model_name_or_path,
-            load_in_8bit=False,
-            device_map="auto"
-        )
-        merged_model = get_peft_model(base_model, lora_config)
-        merged_model = merged_model.from_pretrained(merged_model, adapter_to_push)
-        merged_model = merged_model.merge_and_unload()
-        logger.info("Merged model dtype after merging: %s", merged_model.dtype)
-    except Exception as e:
-        logger.error("Failed during adapter merge: %s", str(e))
-        merged_model = None
-
-    if merged_model is not None:
-        try:
-            logger.info("Pushing the final merged model to the hub: %s", trained_model_repo)
-            merged_model.push_to_hub(trained_model_repo, safe_serialization=True)
-            processor.push_to_hub(trained_model_repo, private=True)
-            logger.info("Successfully pushed the final merged model and processor to the hub.")
-        except Exception as e:
-            logger.error("Failed to push the final merged model to the hub: %s", str(e))
-
 if __name__ == "__main__":
     sweep_id = os.environ.get("SWEEP_ID")
     if sweep_id:
