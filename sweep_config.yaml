@@ -13,9 +13,8 @@ parameters:
     min: 8
     distribution: int_uniform
   num_train_epochs:
-    max: 2
-    min: 1
-    distribution: uniform
+    values: [1, 2, 3]
+    distribution: categorical
   weight_decay:
     values: [0.01, 0.1, 0.2]
     distribution: categorical
