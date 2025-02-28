@@ -14,8 +14,7 @@ from transformers import (
     WhisperProcessor,
     WhisperFeatureExtractor,
     Seq2SeqTrainingArguments,
-    Seq2SeqTrainer,
-    EarlyStoppingCallback,
+    Seq2SeqTrainer
 )
 import wandb
 from transformers.integrations import WandbCallback
@@ -203,8 +202,8 @@ def main():
     warmup_ratio = config.get("warmup_ratio", 0.1)
     num_train_epochs = config.get("num_train_epochs", 1.5)
     generation_max_length = config.get("generation_max_length", 225)
-    eval_steps = 5
-    logging_steps = 5
+    eval_steps = 4
+    logging_steps = 2
     # LoRA hyperparams
     lora_r = config.get("lora_r", 34)
     lora_alpha = config.get("lora_alpha", 8)
@@ -229,7 +228,7 @@ def main():
             "name": "DavronSherbaev/uzbekvoice-filtered",
             "audio_col": "path",
             "text_col": "sentence",
-            "limit": 2000,
+            "limit": 1200,
             "filter_fn": lambda ex: (
                 ex.get("reported_reasons") is None and
                 ex.get("downvotes_count", 0) == 0 and
@@ -318,7 +317,6 @@ def main():
         bf16_full_eval=bf16_full_eval,
         generation_max_length=generation_max_length,
         eval_steps=eval_steps,
-        save_total_limit=5,
         logging_steps=logging_steps,
         remove_unused_columns=False,
         label_names=["labels"],
@@ -346,10 +344,7 @@ def main():
         data_collator=data_collator,
         compute_metrics=lambda pred: compute_metrics(pred, tokenizer),
         tokenizer=processor.feature_extractor,
-        callbacks=[
-            EarlyStoppingCallback(early_stopping_patience=10),
-            WandbCallback(),
-        ],
+        callbacks=[WandbCallback()],
     )
     model.config.use_cache = False
 
