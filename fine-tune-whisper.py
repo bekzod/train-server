@@ -2,6 +2,7 @@
 from dotenv import load_dotenv
 load_dotenv()
 
+import argparse
 import os
 import sys
 import torch
@@ -29,6 +30,16 @@ import getpass
 from dataclasses import dataclass
 from typing import Any, Dict, List, Union
 from peft import LoraConfig, get_peft_model, PeftModel  # Import PeftModel
+
+# Parse command-line arguments to allow loading a LoRA checkpoint.
+parser = argparse.ArgumentParser(description="Training script for Whisper model with LoRA")
+parser.add_argument(
+    "--lora_checkpoint",
+    type=str,
+    default=None,
+    help="Path or repo id for LoRA checkpoint to load (if provided, adapter weights will be loaded)"
+)
+args = parser.parse_args()
 
 # Configure logging to file and console
 logger = logging.getLogger("transformers")
@@ -148,9 +159,6 @@ def load_and_prepare_datasets(datasets_info):
         if "audio" in ds_test.column_names:
             ds_test = ds_test.cast_column("audio", Audio(sampling_rate=16000))
 
-        # NOTE: The previous version applied a map() to trim the text here.
-        # We now handle text trimming inside prepare_dataset so we only call map() once later.
-
         # Apply limit if specified
         if limit is not None:
             ds_train = ds_train.select(range(min(limit, len(ds_train))))
@@ -213,19 +221,6 @@ datasets_info = [
         "revision": "refs/convert/parquet",
         "filter_fn": lambda ex: (ex.get("is_correct") == True) and len(ex["text"].split()) < MAX_WORDS and len(ex["text"].split()) > 0
     },
-    {
-        "name": "bekzod123/uzbek_voice_2",
-        "audio_col": "audio",
-        "text_col": "sentence",
-        "filter_fn": lambda ex: len(ex["sentence"].split()) < MAX_WORDS and len(ex["sentence"].split()) > 0
-    },
-    {
-        "name": "mozilla-foundation/common_voice_17_0",
-        "subset": "uz",
-        "audio_col": "audio",
-        "text_col": "sentence",
-        "filter_fn": lambda ex: len(ex["sentence"].split()) < MAX_WORDS
-    },
 ]
 
 dataset = load_and_prepare_datasets(datasets_info)
@@ -241,7 +236,6 @@ logger.info("Sample training data: %s", dataset["train"][0])
 
 def prepare_dataset(batch):
     # Instead of a separate map call for text trimming, trim the text here.
-    # Handle both single string or list of strings.
     if isinstance(batch["text"], str):
         batch["text"] = batch["text"].strip()
     else:
@@ -256,7 +250,6 @@ def prepare_dataset(batch):
     return batch
 
 logger.info("Stage: Mapping dataset for training")
-# A single map() call now prepares both the features and the trimmed text.
 dataset = dataset.map(
     prepare_dataset,
     remove_columns=dataset.column_names["train"],
@@ -320,33 +313,38 @@ model.generation_config.suppress_tokens = []
 
 logger.info("Stage: Applying LoRA")
 config = LoraConfig(
-    r=34,
-    lora_alpha=8,
+    r=48,
+    lora_alpha=6,
     use_rslora=True,
     target_modules=["q_proj", "v_proj", "k_proj", "out_proj", "fc1", "fc2"],
     modules_to_save=["model.embed_tokens"],
-    lora_dropout=0.1,
+    lora_dropout=0.025,
     bias="none"
 )
-model = get_peft_model(model, config)
-model.print_trainable_parameters()
+if args.lora_checkpoint:
+    logger.info("Loading LoRA adapter from checkpoint: %s", args.lora_checkpoint)
+    # Wrap the base model with LoRA configuration and then load adapter weights.
+    model = get_peft_model(model, config)
+    model = PeftModel.from_pretrained(model, args.lora_checkpoint)
+else:
+    model = get_peft_model(model, config)
+    model.print_trainable_parameters()
 
 logger.info("Stage: Setting training configuration")
 training_args = Seq2SeqTrainingArguments(
     output_dir=trained_model_name,
     per_device_train_batch_size=4,
     per_device_eval_batch_size=4,
-    gradient_accumulation_steps=16,
-    learning_rate=5e-4,
-    weight_decay=0.01,
+    gradient_accumulation_steps=8,
+    learning_rate=0.0005,
+    weight_decay=0.1,
     warmup_ratio=0.1,
-    num_train_epochs=1.5,
+    num_train_epochs=2,
     optim="adamw_torch",
     eval_strategy="steps",
     fp16=not use_bf16,
     bf16=use_bf16,
-    # bf16_full_eval=use_bf16,
-    generation_max_length=225,
+    generation_max_length=228,
     save_steps=1000,
     eval_steps=500,
     save_total_limit=5,
@@ -365,7 +363,6 @@ training_args = Seq2SeqTrainingArguments(
     run_name="my-whisper-run",
 )
 
-# Optionally configure W&B environment before trainer:
 wandb.init(project="my-whisper-project")
 
 trainer = Seq2SeqTrainer(
