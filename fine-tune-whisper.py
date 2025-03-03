@@ -326,8 +326,8 @@ model.generation_config.suppress_tokens = []
 
 logger.info("Stage: Applying LoRA")
 config = LoraConfig(
-    r=48,
-    lora_alpha=6,
+    r=64,
+    lora_alpha=8,
     use_rslora=True,
     target_modules=["q_proj", "v_proj", "k_proj", "out_proj", "fc1", "fc2"],
     modules_to_save=["model.embed_tokens"],
