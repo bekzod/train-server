@@ -331,7 +331,7 @@ config = LoraConfig(
     use_rslora=True,
     target_modules=["q_proj", "v_proj", "k_proj", "out_proj", "fc1", "fc2"],
     modules_to_save=["model.embed_tokens"],
-    lora_dropout=0.025,
+    lora_dropout=0.02,
     bias="none"
 )
 if args.lora_checkpoint:
