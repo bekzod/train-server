@@ -22,8 +22,7 @@ from transformers import (
 import wandb
 from transformers.integrations import WandbCallback
 
-from datasets import Dataset, DatasetDict, load_dataset, concatenate_datasets, Audio, disable_caching
-disable_caching()
+from datasets import Dataset, DatasetDict, load_dataset, concatenate_datasets, Audio
 import librosa
 import soundfile as sf
 import evaluate
@@ -222,19 +221,19 @@ datasets_info = [
         "revision": "refs/convert/parquet",
         "filter_fn": lambda ex: (ex.get("is_correct") == True) and len(ex["text"].split()) < MAX_WORDS and len(ex["text"].split()) > 0
     },
-    {
-        "name": "bekzod123/uzbek_voice_2",
-        "audio_col": "audio",
-        "text_col": "sentence",
-        "filter_fn": lambda ex: len(ex["sentence"].split()) < MAX_WORDS and len(ex["sentence"].split()) > 0
-    },
-    {
-        "name": "mozilla-foundation/common_voice_17_0",
-        "subset": "uz",
-        "audio_col": "audio",
-        "text_col": "sentence",
-        "filter_fn": lambda ex: len(ex["sentence"].split()) < MAX_WORDS
-    },
+    # {
+    #     "name": "bekzod123/uzbek_voice_2",
+    #     "audio_col": "audio",
+    #     "text_col": "sentence",
+    #     "filter_fn": lambda ex: len(ex["sentence"].split()) < MAX_WORDS and len(ex["sentence"].split()) > 0
+    # },
+    # {
+    #     "name": "mozilla-foundation/common_voice_17_0",
+    #     "subset": "uz",
+    #     "audio_col": "audio",
+    #     "text_col": "sentence",
+    #     "filter_fn": lambda ex: len(ex["sentence"].split()) < MAX_WORDS
+    # },
 ]
 
 dataset = load_and_prepare_datasets(datasets_info)
