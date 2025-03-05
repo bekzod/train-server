@@ -22,7 +22,8 @@ from transformers import (
 import wandb
 from transformers.integrations import WandbCallback
 
-from datasets import Dataset, DatasetDict, load_dataset, concatenate_datasets, Audio
+from datasets import Dataset, DatasetDict, load_dataset, concatenate_datasets, Audio, disable_caching
+disable_caching()
 import librosa
 import soundfile as sf
 import evaluate
@@ -360,7 +361,7 @@ training_args = Seq2SeqTrainingArguments(
     generation_max_length=228,
     save_steps=1000,
     eval_steps=500,
-    save_total_limit=4,
+    save_total_limit=3,
     logging_steps=250,
     remove_unused_columns=False,
     label_names=["labels"],
