@@ -294,16 +294,22 @@ class DataCollatorSpeechSeq2SeqWithPadding:
         return batch
 
 data_collator = DataCollatorSpeechSeq2SeqWithPadding(processor=processor)
-metric = evaluate.load("wer")
+wer_metric = evaluate.load("wer")
+cer_metric = evaluate.load("cer")
 
 def compute_metrics(pred):
     pred_ids = pred.predictions
     label_ids = pred.label_ids
+
     label_ids[label_ids == -100] = tokenizer.pad_token_id
+
     pred_str = tokenizer.batch_decode(pred_ids, skip_special_tokens=True)
     label_str = tokenizer.batch_decode(label_ids, skip_special_tokens=True)
-    wer_val = 100 * metric.compute(predictions=pred_str, references=label_str)
-    return {"wer": wer_val}
+
+    wer_val = 100 * wer_metric.compute(predictions=pred_str, references=label_str)
+    cer_val = 100 * cer_metric.compute(predictions=pred_str, references=label_str)
+
+    return {"wer": wer_val, "cer": cer_val}
 
 logger.info("Stage: Loading pre-trained Whisper model")
 model = WhisperForConditionalGeneration.from_pretrained(
@@ -327,11 +333,11 @@ model.generation_config.suppress_tokens = []
 logger.info("Stage: Applying LoRA")
 config = LoraConfig(
     r=64,
-    lora_alpha=8,
+    lora_alpha=6,
     use_rslora=True,
     target_modules=["q_proj", "v_proj", "k_proj", "out_proj", "fc1", "fc2"],
     modules_to_save=["model.embed_tokens"],
-    lora_dropout=0.02,
+    lora_dropout=0.025,
     bias="none"
 )
 if args.lora_checkpoint:
@@ -350,14 +356,14 @@ training_args = Seq2SeqTrainingArguments(
     per_device_eval_batch_size=4,
     gradient_accumulation_steps=8,
     learning_rate=0.0005,
-    weight_decay=0.1,
-    warmup_ratio=0.1,
+    weight_decay=0.12,
+    warmup_ratio=0.12,
     num_train_epochs=2.5,
     optim="adamw_torch",
     eval_strategy="steps",
     fp16=not use_bf16,
     bf16=use_bf16,
-    generation_max_length=228,
+    generation_max_length=225,
     save_steps=1000,
     eval_steps=500,
     save_total_limit=3,
