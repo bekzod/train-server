@@ -78,7 +78,7 @@ def postprocess_text(text: str) -> str:
     # text = text.replace("gʻ", "ğ")
     text = text.replace("h", "x")
     # text = text.replace("'", "")
-    text = re.sub(r"[^a-zşçöğ\s]", " ", text)
+    text = re.sub(r"[^a-zşçöğ'\s]", " ", text)
     text = re.sub(r"\s+", " ", text)
     text = text.strip()
     return text
