@@ -68,6 +68,32 @@ trained_model_repo = org + '/' + trained_model_name
 
 logger.info("Stage: Loading and preparing additional datasets")
 
+def postprocess_text(text: str) -> str:
+    """
+    Replace specific character sequences with target characters.
+    For example:
+      - "sh" -> "ş"
+      - "ch" -> "ç"
+      - "o'" -> "Ö"
+      - "g'" -> "Ğ"
+    """
+    text = text.lower()
+    text = text.replace("sh", "ş")
+    text = text.replace("ch", "ç")
+    text = text.replace("o'", "ö")
+    text = text.replace("oʻ", "ö")
+    text = text.replace("g'", "ğ")
+    text = text.replace("gʻ", "ğ")
+    text = text.replace("h", "x")
+    text = text.replace("ʻ", "")
+    text = text.replace("'", "")
+    text = re.sub(r"[^a-zşçöğ\s]", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    text = text.strip()
+
+    return text
+
+
 def load_and_prepare_datasets(datasets_info):
     combined_dataset = DatasetDict()
     for dataset_info in datasets_info:
@@ -147,6 +173,9 @@ def load_and_prepare_datasets(datasets_info):
 
         ds_train = ds_train.rename_columns(rename_map)
         ds_test = ds_test.rename_columns(rename_map)
+
+        ds_train = ds_train.map(lambda x: {"text": postprocess_text(x["text"])})
+        ds_test = ds_test.map(lambda x: {"text": postprocess_text(x["text"])})
 
         # Keep only "audio" and "text" columns
         columns_to_keep = ["audio", "text"]
